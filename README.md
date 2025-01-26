@@ -40,17 +40,19 @@ client.AddQueue(new QueueConfiguration
 3. Implement message handlers by creating classes that implement either `IMessageHandler<TIn>` or `IMessageHandler<TIn, TOut>` interfaces:
 
 ```csharp
+
+// IMessageHandler<IncomingMessage, OutgoingMessage> 
 public class OrderMessageHandler : IMessageHandler<OrderMessage, PaymentMessage>
 {
-    // Implement HandleMessage method
+    // Implement HandleMethod where <MessageHandlingResult<object> is your outgoing and RabbitMessage<object> is your incoming. 
     public async ValueTask<MessageHandlingResult<PaymentMessage>> HandleMessage(RabbitMessage<OrderMessage> message)
     {
         // Process the order and create a payment message
         var paymentMessage = new RabbitMessage<PaymentMessage>
         {
             MessageId = Guid.NewGuid().ToString(),
-            QueueName = "payments",
-            Payload = new PaymentMessage
+            QueueName = "payments", // define the queue you want to send to. 
+            Payload = new PaymentMessage // create the payload. 
             {
                 OrderId = message.Payload.OrderId,
                 Amount = message.Payload.Amount,
@@ -60,17 +62,18 @@ public class OrderMessageHandler : IMessageHandler<OrderMessage, PaymentMessage>
 
         return new MessageHandlingResult<PaymentMessage>
         {
-            Success = true,
-            OriginalDeliveryTag = message.DeliveryTag,
-            OutputMessage = paymentMessage,
-            ShouldAcknowledge = true
+            Success = true, // return true once everything is processed in your handler, if not within the catch clause you may return success was false. 
+            OriginalDeliveryTag = message.DeliveryTag, // for ack-ing the deliveryTag. 
+            OutputMessage = paymentMessage, // reference your payment message here for sending
+            ShouldAcknowledge = true // can set to false within catch clause for reprocessing. 
         };
     }
 }
 
+// IMessage<IncomingMessage> 
 public class PaymentMessageHandler : IMessageHandler<PaymentMessage>
 {
-    // Implement HandleMessage method
+    // We do not need to return anything in MessageHandlingResult as this will no longer send anything back.
     public ValueTask<MessageHandlingResult> HandleMessage(RabbitMessage<PaymentMessage> message)
     {
         // Process the payment
@@ -111,15 +114,6 @@ var testOrder = new RabbitMessage<OrderMessage>
 
 await client.PublishMessage("orders", testOrder);
 ```
-
-## Chaining Message Handlers
-
-RabbitMultiQueue supports chaining message handlers to create pipelines where the output of one handler becomes the input of another. To chain message handlers:
-
-1. Implement a message handler that takes an input type `TIn` and produces an output type `TOut`.
-2. Configure a producer queue for the output type `TOut`.
-3. In the message handler, create an instance of `RabbitMessage<TOut>` with the output payload, set the `QueueName` property to specify the target queue, and include it in the `MessageHandlingResult<TOut>`.
-4. The RabbitMultiQueue library will automatically publish the output message to the configured producer queue.
 
 ## License
 
