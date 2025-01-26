@@ -115,6 +115,20 @@ var testOrder = new RabbitMessage<OrderMessage>
 await client.PublishMessage("orders", testOrder);
 ```
 
+Error Handling Example: 
+```cs
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "❌ Failed to process order");
+            return new MessageHandlingResult<PaymentMessage>
+            {
+                Success = false,
+                OriginalDeliveryTag = message.DeliveryTag,
+                ShouldAcknowledge = false
+            };
+        }
+```
+
 ## License
 
 RabbitMultiQueue is released under the [MIT License](https://opensource.org/licenses/MIT).
